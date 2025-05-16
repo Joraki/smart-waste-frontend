@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bin Monitoring Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 0; }
+        header { background-color: #4CAF50; color: white; padding: 15px 0; text-align: center; margin-bottom: 20px; }
+        .main-content, .analytics-content { display: flex; flex-direction: column; align-items: center; padding: 0 10px; }
+        .container { max-width: 900px; width: 100%; margin: 0 auto 20px auto; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); display: flex; flex-wrap: wrap; justify-content: center; padding: 10px; order: 1; min-height: 100px; }
+        .bin-card { width: 220px; margin: 10px; background: #f9f9f9; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; align-items: center; transition: box-shadow 0.3s ease, border 0.3s ease; }
+        .bin-card:hover { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); cursor: pointer; }
+        .bin-card.highlighted { border: 2px solid #007bff; box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4); }
+        .bin { position: relative; width: 80px; height: 120px; margin: 10px auto; background-color: #ddd; border: 2px solid #aaa; border-radius: 5px; overflow: hidden; }
+        .bin-fill { position: absolute; bottom: 0; width: 100%; height: 0%; background-color: #4CAF50; transition: height 0.5s ease; }
+        .status { font-size: 1.1rem; font-weight: bold; margin: 10px 0 0 0; }
+        .status.full { color: red; }
+
+        /* Section for Map and its Button */
+        .map-section {
+            display: flex;
+            flex-direction: column; /* Default: button below map */
+            align-items: center;
+            width: 100%;
+            max-width: 800px; /* Max width for this section */
+            margin: 0 auto 50px auto;
+            order: 2; /* Order in main content flow */
+            
+        }
+        #map {
+            width: 100%;
+            height: 350px;
+            background: #eee;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 10px; /* Space if button is below */
+            margin-top: 20 px;
+        }
+        #optimizeRouteBtn {
+            padding: 10px 20px; background-color: #4CAF50; color: white;
+            border: none; border-radius: 5px; cursor: pointer; font-size: 1rem;
+            width: auto; /* Adjust as needed, or fit-content */
+        }
+        #optimizeRouteBtn:hover { background-color: #45a049; }
+
+        /* Section for Dashboard Chart and its Button */
+        .chart-section {
+            display: flex;
+            flex-direction: column; /* Default: button below chart */
+            align-items: center;
+            width: 100%;
+            max-width: 900px; /* Max width for this section */
+            margin: 0 auto 20px auto;
+            padding-left: 45px;
+            order: 3; /* Order in main content flow */
+        }
+        #chart-container { /* This is the container for the dashboard chart canvas */
+            width: 100%;
+            height: 300px; background: white; padding: 15px;box-sizing: border-box;
+            border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            margin-bottom: 10px; /* Space if button is below */
+        }
+        #chart { width: 100%; height: 100%; } /* Canvas for dashboard chart */
+        #viewAnalyticsBtn {
+            padding: 10px 20px; background-color: #17a2b8; color: white; /* Teal color */
+            border: none; border-radius: 5px; cursor: pointer; font-size: 1rem;
+            width: auto; /* Adjust as needed */
+        }
+        #viewAnalyticsBtn:hover { background-color: #138496; }
+
+        .message-area { text-align: center; padding: 20px; font-style: italic; color: #555; width: 100%; }
+
+        /* Styles for Analytics View */
+        #analyticsView {
+            display: none; /* Hidden by default */
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #analyticsChartContainer {
+            width: 95%;
+            max-width: 800px;
+            height: 400px;
+            background: white;
+            padding: 15px; box-sizing: border-box;
+            margin: 20px auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        #analyticsChart { width: 100%; height: 100%; } /* Canvas for analytics chart */
+        .analytics-controls { text-align: center; margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .analytics-controls button { padding: 10px 15px; font-size: 0.9rem; background-color: #007bff; color:white; border:none; border-radius: 5px; cursor:pointer; }
+        .analytics-controls button:hover { background-color: #0056b3; }
+        #analyticsTableContainer {
+            margin-top: 20px;
+            width: 95%;
+            max-width: 800px;
+            overflow-x: auto;
+        }
+        #analyticsTableContainer table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        #analyticsTableContainer th, #analyticsTableContainer td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        #analyticsTableContainer th { background-color: #f2f2f2; }
+
+
+        /* Media query for side-by-side layout on larger screens */
+        @media (min-width: 768px) {
+            .map-section, .chart-section {
+                flex-direction: row; /* Side-by-side */
+                justify-content: space-between;
+                gap: 20px;
+            }
+            #map, #chart-container {
+                flex-grow: 1; /* Allow map/chart to take available space */
+                margin-bottom: 0; /* Remove bottom margin when side-by-side */
+            }
+            #optimizeRouteBtn, #viewAnalyticsBtn {
+                width: auto; /* Let button size to its content */
+                align-self: center; /* Vertically align button with map/chart */
+                /*white-space: nowrap; /* Prevent button text from wrapping too soon */
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.min.js"></script>
+    <script src="https://unpkg.com/@gegeweb/leaflet-routing-machine-openroute@latest/dist/leaflet-routing-openroute.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@^2.3.1"></script> <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@^1.1.0"></script> </head>
+<body>
+    <header><h1>Smart Bin Monitoring System</h1></header>
+
+    <div id="dashboardView" class="main-content">
+        <div class="container" id="binContainer">
+            <p class="message-area" id="loadingMessage">Loading bin data...</p>
+        </div>
+
+        <div class="map-section">
+            <div id="map"></div>
+            <button id="optimizeRouteBtn" onclick="triggerRouteCalculation()">Optimize Route</button>
+        </div>
+
+        <div class="chart-section">
+            <div id="chart-container"> <canvas id="chart"></canvas> </div>
+            <button id="viewAnalyticsBtn">View Advanced Analytics</button>
+        </div>
+    </div>
+
+    <div id="analyticsView" class="analytics-content">
+        <h2>Advanced Analytics - Bin Status Over Time</h2>
+        <div class="analytics-controls">
+        <div id="analyticsTableContainer">
+            <button id="downloadPdfBtn">Download PDF Report</button>
+            <button id="backToDashboardBtn">Back to Dashboard</button>
+        </div>
+        <div id="analyticsChartContainer">
+            <canvas id="analyticsChart"></canvas>
+        </div>
+        <div id="analyticsTableContainer" >
+            </div>
+    </div>
+
+    <script>
+        // --- Global variables ---
+        const binContainer = document.getElementById("binContainer");
+        const loadingMessage = document.getElementById("loadingMessage");
+        const optimizeBtn = document.getElementById("optimizeRouteBtn");
+        const dashboardChartCtx = document.getElementById("chart").getContext("2d"); // Context for main dashboard chart
+        let binElements = {};
+        let previousBinData = {};
+        let binMarkers = {};
+        let routingControl = null;
+        let socket;
+        const serverBaseUrl = "https://smart-waste-server.onrender.com"; // Define this once globally
+        const wsUrl = "wss://smart-waste-server.onrender.com";  
+        const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const ws = new WebSocket(`${wsProtocol}//smart-waste-server.onrender.com`);
+
+ws.onopen = () => {
+  console.log("🔌 Connected to WebSocket server.");
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  console.log("📥 WS message received:", message);
+
+  if (message.type === "bin_update") {
+    // Update the UI with the new bin data
+    updateOrInsertBinCard(message.payload);
+  } else if (message.type === "all_bins") {
+    renderBins(message.payload); // Initial full data
+  }
+};
+
+ws.onclose = () => {
+  console.warn("⚠️ WebSocket connection closed.");
+};
+
+ws.onerror = (err) => {
+  console.error("❌ WebSocket error:", err);
+};
+ 
+
+        // --- DOM Elements for View Toggling and Analytics ---
+        const dashboardView = document.getElementById("dashboardView");
+        const analyticsView = document.getElementById("analyticsView");
+        const viewAnalyticsBtn = document.getElementById("viewAnalyticsBtn");
+        const backToDashboardBtn = document.getElementById("backToDashboardBtn");
+        const analyticsChartCtx = document.getElementById("analyticsChart").getContext("2d"); // Context for analytics chart
+        const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+        const analyticsTableContainer = document.getElementById("analyticsTableContainer");
+        let analyticsChartInstance; // To hold the analytics Chart.js instance
+
+        // --- Leaflet Icon Setup ---
+        const binIcon = L.icon({ iconUrl: 'https://img.icons8.com/material-outlined/48/000000/trash--v1.png', iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] });
+        const binIconFull = L.icon({ iconUrl: 'https://img.icons8.com/ios-glyphs/60/FA5252/trash--v1.png', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] });
+        const startIcon = L.icon({ iconUrl: 'https://img.icons8.com/ios-filled/50/4CAF50/marker.png', iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30] });
+
+        // --- Dashboard Chart Initialization ---
+        const dashboardChart = new Chart(dashboardChartCtx, {
+            type: "line", data: { labels: [], datasets: [] },
+            options: { responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: { legend: { display: true } },
+                scales: {
+                    x: { title: { display: true, text: "Timestamp (Recent)" }, type: 'time', time: { tooltipFormat: 'HH:mm:ss', unit:'second', displayFormats: { second: 'HH:mm:ss' } } },
+                    y: { title: { display: true, text: "Distance (cm)" }, beginAtZero: true }
+                }
+            }
+        });
+
+        // --- Map Initialization ---
+        const map = L.map("map").setView([-1.28333, 36.8219], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+
+        // --- Core Function to Update Dashboard UI for a Single Bin ---
+        function updateBinUI(binData) {
+            const currentBinId = binData.binNumber;
+            if (currentBinId === undefined || currentBinId === null) { console.warn("updateBinUI: Missing binNumber", binData); return; }
+            const currentDistance = (typeof binData.distance === 'number' && !isNaN(binData.distance)) ? binData.distance : -1;
+            const currentStatus = binData.status || "Unknown";
+            const timestamp = binData.timestamp ? new Date(binData.timestamp) : new Date(); // Use Date object for chart
+            const lat = parseFloat(binData.lat); const lng = parseFloat(binData.lng);
+
+            if(loadingMessage && loadingMessage.style.display !== 'none') loadingMessage.style.display = 'none';
+
+            let cardJustCreated = false;
+            if (!binElements[currentBinId]) {
+                const binCard = document.createElement("div"); binCard.className = "bin-card"; binCard.id = `bin-${currentBinId}`;
+                const binElementDiv = document.createElement("div"); binElementDiv.className = "bin";
+                const binFill = document.createElement("div"); binFill.className = "bin-fill"; binElementDiv.appendChild(binFill);
+                const statusElement = document.createElement("p"); statusElement.className = "status";
+                binCard.appendChild(binElementDiv); binCard.appendChild(statusElement);
+                if(loadingMessage && binContainer.contains(loadingMessage)) binContainer.replaceChild(binCard, loadingMessage);
+                else binContainer.appendChild(binCard);
+                binElements[currentBinId] = { binCard, binFill, statusElement };
+                cardJustCreated = true;
+            }
+
+            const { binCard, binFill, statusElement } = binElements[currentBinId];
+
+            const fillHeight = currentDistance >= 0 ? Math.max(0, Math.min(100, 100 - (currentDistance / 28) * 100)) : 0;
+            if (binFill) binFill.style.height = `${fillHeight}%`;
+            const newStatusText = `Bin ${currentBinId}: ${currentStatus} (Dist: ${currentDistance >= 0 ? currentDistance + ' cm' : 'N/A'})`;
+            if (statusElement) {
+                if (statusElement.textContent !== newStatusText) statusElement.textContent = newStatusText;
+                if (currentStatus === 'Full') statusElement.classList.add('full'); else statusElement.classList.remove('full');
+            }
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                 const chosenIcon = currentStatus === 'Full' ? binIconFull : binIcon;
+                 const popupContent = `<strong>Bin ${currentBinId}</strong><br>Status: ${currentStatus}<br>Dist: ${currentDistance}cm<br>Last: ${timestamp.toLocaleTimeString()}`;
+                 if (binMarkers[currentBinId]) {
+                     binMarkers[currentBinId].setLatLng([lat, lng]); binMarkers[currentBinId].setIcon(chosenIcon); binMarkers[currentBinId].setPopupContent(popupContent);
+                 } else {
+                     binMarkers[currentBinId] = L.marker([lat, lng], { icon: chosenIcon }).addTo(map).bindPopup(popupContent);
+                 }
+            } else if (binMarkers[currentBinId]) { map.removeLayer(binMarkers[currentBinId]); delete binMarkers[currentBinId]; }
+
+            if (binCard && !isNaN(lat) && !isNaN(lng) && binMarkers[currentBinId]) {
+                binCard.style.cursor = "pointer";
+                if (!binCard.dataset.listenerAdded) {
+                    binCard.onclick = function() {
+                        map.setView([lat, lng], 17); binMarkers[currentBinId].openPopup();
+                        document.querySelectorAll('.bin-card.highlighted').forEach(c => c.classList.remove('highlighted'));
+                        binCard.classList.add('highlighted');
+                    };
+                    binCard.dataset.listenerAdded = 'true';
+                }
+            } else if (binCard) { binCard.style.cursor = "default"; binCard.onclick = null; delete binCard.dataset.listenerAdded; }
+
+            // Update Dashboard Chart
+            let chartDataActuallyChanged = false;
+            let datasetIndex = dashboardChart.data.datasets.findIndex(ds => ds.label === `Bin ${currentBinId}`);
+            if (datasetIndex === -1 && currentDistance >= 0) {
+                datasetIndex = dashboardChart.data.datasets.length;
+                dashboardChart.data.datasets.push({
+                    label: `Bin ${currentBinId}`, data: [],
+                    borderColor: `hsl(${(datasetIndex * 60) % 360}, 70%, 50%)`, borderWidth: 2, fill: false, tension: 0.1
+                });
+                for(let i = 0; i < dashboardChart.data.labels.length; i++) { dashboardChart.data.datasets[datasetIndex].data.push(null); }
+                chartDataActuallyChanged = true;
+            }
+            if (currentDistance >= 0 && datasetIndex !== -1) {
+                 dashboardChart.data.datasets[datasetIndex].data.push({x: timestamp, y: currentDistance});
+                 chartDataActuallyChanged = true;
+                 const maxDataPoints = 20;
+                 if (dashboardChart.data.datasets[datasetIndex].data.length > maxDataPoints) { dashboardChart.data.datasets[datasetIndex].data.shift(); }
+                 // Prune overall labels (simplified)
+                 while (dashboardChart.data.labels.length > maxDataPoints && dashboardChart.data.datasets.every(ds => ds.data.length === 0 || ds.data[0].x > dashboardChart.data.labels[0])) {
+                    dashboardChart.data.labels.shift();
+                 }
+            }
+            if (chartDataActuallyChanged) dashboardChart.update('none');
+            previousBinData[currentBinId] = currentDistance;
+        }
+
+        // --- WebSocket Connection & Message Handling ---
+        function connectWebSocket() {
+            //const wsUrl = `ws://smart-waste-server.onrender.com`;
+            socket = new WebSocket(wsUrl);
+            socket.onopen = (event) => console.log("✅ WebSocket established.");
+            socket.onmessage = handleWebSocketMessage;
+            socket.onclose = (event) => { console.log("🔌 WebSocket closed. Reconnecting...", event.reason); setTimeout(connectWebSocket, 5000); };
+            socket.onerror = (error) => console.error("WebSocket error:", error);
+        }
+        function handleWebSocketMessage(event) {
+             try {
+                 const message = JSON.parse(event.data);
+                 if (message.type === 'bin_update' && message.payload) updateBinUI(message.payload);
+                 else if (message.type === 'all_bins' && Array.isArray(message.payload)) message.payload.forEach(binData => updateBinUI(binData));
+                 else if (message.type === 'route_update' && Array.isArray(message.payload)) displayRouteWithInstructions(message.payload);
+             } catch (error) { console.error("Error processing WebSocket message:", error); }
+        }
+        console.log("👋 Script is running");
+
+        // --- Initial Data Fetch ---
+        async function fetchInitialData() {
+            try {
+                console.log ("Fetching from", 'https://smart-waste-server.onrender.com')
+                //const serverBaseUrl = `https://smart-waste-server.onrender.com`;
+                const response = await fetch(`${serverBaseUrl}/api/bins?t=${Date.now()}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const bins = await response.json();
+                 if (Array.isArray(bins)) {
+                     if (bins.length > 0) bins.forEach(bin => updateBinUI(bin));
+                     else { if(loadingMessage) loadingMessage.textContent = 'No bin data available yet.'; if(loadingMessage) loadingMessage.style.display = 'block'; }
+                 } else { throw new Error("Invalid initial data format"); }
+            } catch (error) {
+                console.error("Error fetching initial data:", error);
+                if(loadingMessage) loadingMessage.textContent = 'Could not load initial data. Server running?'; if(loadingMessage) loadingMessage.style.display = 'block';
+            }
+        }
+
+        // --- Geolocation ---
+        function getCurrentLocation() {
+             return new Promise((resolve, reject) => {
+                 if (!navigator.geolocation) return reject(new Error("Geolocation not supported."));
+                 navigator.geolocation.getCurrentPosition(
+                     (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+                     (error) => { console.error("Geo error:", error); resolve({ latitude: -1.28333, longitude: 36.8219 }); /* Default */ },
+                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                 );
+             });
+        }
+
+        // --- Display Route with LRM ---
+        function displayRouteWithInstructions(waypoints) {
+            if (routingControl != null) { map.removeControl(routingControl); routingControl = null; }
+            if (!Array.isArray(waypoints) || waypoints.length < 2) { console.log("ℹ️ Need >= 2 waypoints for route."); return; }
+            console.log("Displaying route with LRM for waypoints:", waypoints);
+            try {
+                 routingControl = L.Routing.control({
+                     waypoints: waypoints.map(wp => L.latLng(wp.lat, wp.lon)),
+                     router: new L.Routing.OpenRouteService('5b3ce3597851110001cf6248efa586d33ac54e8f934cd4c63647730f', { // Your ORS API Key
+                          serviceUrl: 'https://api.openrouteservice.org/v2/directions',
+                          profile: 'driving-car',
+                     }),
+                     lineOptions: { styles: [{color: 'blue', opacity: 0.8, weight: 6}] },
+                     show: true, addWaypoints: false, routeWhileDragging: false,
+                     draggableWaypoints: false, fitSelectedRoutes: 'smart',
+                     createMarker: function(i, waypoint, nWps) {
+                          let icon = (i === 0) ? startIcon : binIcon;
+                          return L.marker(waypoint.latLng, { icon: icon, draggable: false }).bindPopup(`Waypoint ${i + 1}`);
+                     },
+                     formatter: L.routing.formatterORS({
+                         language: 'en',
+                         steptotext: true,
+                     })
+                    // The formatter below might conflict with ORS v2's direct language param.
+                    // If language works with routingQueryParams, you might not need this LRM formatter for language.
+                    // formatter: new L.Routing.Formatter({ language: 'en' })
+                 }).addTo(map);
+                 routingControl.on('routingerror', function(e) { console.error('LRM Routing Error:', e.error); alert(`Routing Error: ${e.error.message || 'Could not calculate route.'}`); if (routingControl != null) { map.removeControl(routingControl); routingControl = null; } });
+             } catch (error) { console.error("Error creating LRM control:", error); alert("Error setting up routing display. Check LRM ORS plugin include & class name?"); }
+        }
+
+        // --- Trigger Route Calculation ---
+        async function triggerRouteCalculation() {
+            if(optimizeBtn) { optimizeBtn.textContent = "Calculating..."; optimizeBtn.disabled = true; }
+            let startLocation;
+            try {
+                startLocation = await getCurrentLocation();
+                //const serverBaseUrl = `https://smart-waste-server.onrender.com`;
+                const response = await fetch(`${serverBaseUrl}/api/route`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ startLat: startLocation.latitude, startLon: startLocation.longitude })
+                });
+                if (!response.ok) { const errTxt = await response.text(); throw new Error(`Route calculation failed: ${response.status} ${errTxt}`); }
+                const waypoints = await response.json();
+                displayRouteWithInstructions(waypoints);
+            } catch (error) { console.error("Error triggering route calculation:", error); alert(`Error: ${error.message}`); }
+            finally { if(optimizeBtn) { optimizeBtn.textContent = "Optimize Route From My Location"; optimizeBtn.disabled = false; } }
+        }
+
+
+        // --- Analytics View Functions ---
+        async function loadAdvancedAnalytics() {
+            console.log("Loading advanced analytics...");
+            analyticsTableContainer.innerHTML = "<p class='message-area'>Fetching historical data...</p>";
+            if (analyticsChartInstance) analyticsChartInstance.destroy();
+
+            try {
+                //const serverBaseUrl = `https://smart-waste-server.onrender.com`;
+                const response = await fetch(`${serverBaseUrl}/api/logs`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const logs = await response.json();
+
+                if (Array.isArray(logs) && logs.length > 0) {
+                    renderAnalyticsChart(logs);
+                    renderAnalyticsTable(logs);
+                } else {
+                    const chartContainer = document.getElementById('analyticsChartContainer');
+                    if(chartContainer) chartContainer.innerHTML = "<p class='message-area'>No historical data available.</p>";
+                    analyticsTableContainer.innerHTML = "";
+                }
+            } catch (error) {
+                console.error("Error fetching/processing analytics data:", error);
+                const chartContainer = document.getElementById('analyticsChartContainer');
+                if(chartContainer) chartContainer.innerHTML = `<p class='message-area'>Error loading analytics: ${error.message}</p>`;
+                analyticsTableContainer.innerHTML = "";
+            }
+        }
+
+        function renderAnalyticsChart(logs) {
+            const datasetsByBin = {};
+            // No need for allTimestamps set if using Chart.js time scale correctly with point objects
+            logs.forEach(log => {
+                const binId = log.binNumber;
+                const timestamp = new Date(log.timestamp); // Use Date objects for x values
+                if (!datasetsByBin[binId]) {
+                    const datasetIndex = Object.keys(datasetsByBin).length;
+                    datasetsByBin[binId] = {
+                        label: `Bin ${binId}`, data: [],
+                        borderColor: `hsl(${(datasetIndex * 60) % 360}, 70%, 50%)`,
+                        borderWidth: 2, fill: false, tension: 0.1
+                    };
+                }
+                if (typeof log.distance === 'number' && log.distance >= 0) {
+                    datasetsByBin[binId].data.push({ x: timestamp, y: log.distance });
+                }
+            });
+
+            const finalDatasets = Object.values(datasetsByBin).map(ds => {
+                ds.data.sort((a,b) => a.x - b.x); // Sort data points by time for each dataset
+                return ds;
+            });
+
+            if (analyticsChartInstance) analyticsChartInstance.destroy();
+            analyticsChartInstance = new Chart(analyticsChartCtx, {
+                type: 'line',
+                data: { datasets: finalDatasets }, // Labels are inferred from data.x
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: 'Bin Fill Distance Over Time (Historical)' }, legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            title: { display: true, text: 'Timestamp' },
+                            time: { unit: 'hour', tooltipFormat: 'MMM d, HH:mm:ss', displayFormats: { hour: 'MMM d, HH:mm' } }, // Adjust unit for better display
+                            ticks: { major: { enabled: true }, source: 'auto', autoSkip: true, maxTicksLimit: 15 } // Improve tick display
+                        },
+                        y: { title: { display: true, text: 'Distance (cm)' }, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function renderAnalyticsTable(logs) {
+            if (!Array.isArray(logs) || logs.length === 0) { analyticsTableContainer.innerHTML = "<p class='message-area'>No historical data for table.</p>"; return; }
+            let tableHTML = `<table border="1"><thead><tr><th>Timestamp</th><th>Bin ID</th><th>Status</th><th>Distance (cm)</th></tr></thead><tbody>`;
+            logs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)); // Show newest first
+            logs.forEach(log => {
+                tableHTML += `<tr>
+                                <td>${new Date(log.timestamp).toLocaleString()}</td>
+                                <td>${log.binNumber}</td>
+                                <td>${log.status}</td>
+                                <td>${log.distance >= 0 ? log.distance : 'N/A'}</td>
+                              </tr>`;
+            });
+            tableHTML += `</tbody></table>`;
+            analyticsTableContainer.innerHTML = tableHTML;
+        }
+
+        downloadPdfBtn.onclick = function() {
+            console.log("Attempting to download PDF report...");
+            const reportTitle = "Smart Bin Analytics Report";
+            const dateGenerated = `Generated: ${new Date().toLocaleString()}`;
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const margin = 40; let yPos = margin;
+
+            pdf.setFontSize(20); pdf.text(reportTitle, pdfWidth / 2, yPos, { align: 'center' }); yPos += 30;
+            pdf.setFontSize(10); pdf.text(dateGenerated, margin, yPos); yPos += 20;
+
+            const chartCanvasElement = document.getElementById('analyticsChart');
+            if (analyticsChartInstance && chartCanvasElement && chartCanvasElement.height > 0) {
+                html2canvas(chartCanvasElement, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
+                    const chartImageData = canvas.toDataURL('image/png', 0.9);
+                    const imgProps = pdf.getImageProperties(chartImageData);
+                    const imgWidth = pdfWidth - 2 * margin;
+                    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                    if (yPos + imgHeight > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); yPos = margin; }
+                    pdf.addImage(chartImageData, 'PNG', margin, yPos, imgWidth, imgHeight);
+                    yPos += imgHeight + 20;
+                    // Add table using autoTable if available (not included by default)
+                    const tableElement = analyticsTableContainer.querySelector('table');
+                    if (tableElement && typeof pdf.autoTable === 'function') {
+                        if (yPos + 20 > pdf.internal.pageSize.getHeight() - margin) { pdf.addPage(); yPos = margin; }
+                        pdf.autoTable({ html: tableElement, startY: yPos });
+                    } else if (tableElement) {
+                         pdf.text("Table data (requires jsPDF-AutoTable plugin for better formatting).", margin, yPos);
+                    }
+                    pdf.save('smartbin-analytics-report.pdf');
+                }).catch(err => { console.error("Error generating PDF:", err); alert("Failed to generate PDF."); });
+            } else {
+                alert("Analytics chart not available or not rendered for PDF.");
+                // pdf.save('smartbin-analytics-report-no-chart.pdf'); // Optionally save without chart
+            }
+        };
+
+        // --- View Toggling Logic ---
+        viewAnalyticsBtn.onclick = function() {
+            dashboardView.style.display = 'none';
+            analyticsView.style.display = 'flex';
+            loadAdvancedAnalytics();
+        };
+        backToDashboardBtn.onclick = function() {
+            analyticsView.style.display = 'none';
+            dashboardView.style.display = 'flex';
+        };
+
+        // --- Initialize Page ---
+        document.addEventListener("DOMContentLoaded", () => {
+          fetchInitialData(); connectWebSocket();
+          dashboardView.style.display = 'flex'; analyticsView.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
+
